@@ -1,0 +1,24 @@
+services:
+  wra:
+    build:
+      context: wra
+      target: final
+    ports:
+      - 8079:8079
+    environment:
+      WRA_PROXY_TARGET: "http://vulnapp:5000"
+      WRA_REDIS_ADDR: "redis:6379"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  vulnapp:
+    build: wra-example-app
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+

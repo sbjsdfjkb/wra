@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block header %}My Cards{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Add Card Form -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-plus-circle"></i> Add New Card</h5>
+            </div>
+            <div class="card-body">
+                <form id="addCardForm">
+                    <div class="mb-3">
+                        <label for="card_number" class="form-label">Card Number</label>
+                        <input type="text" class="form-control" id="card_number" name="card_number"
+                               maxlength="19" placeholder="1234 5678 9012 3456" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="card_holder_name" class="form-label">Card Holder Name</label>
+                        <input type="text" class="form-control" id="card_holder_name" name="card_holder_name"
+                               placeholder="John Doe" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="expiry_date" class="form-label">Expiry Date</label>
+                        <input type="date" class="form-control" id="expiry_date" name="expiry_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cvv" class="form-label">CVV</label>
+                        <input type="text" class="form-control" id="cvv" name="cvv"
+                               maxlength="3" placeholder="123" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="card_type" class="form-label">Card Type</label>
+                        <select class="form-select" id="card_type" name="card_type" required>
+                            <option value="debit">Debit Card</option>
+                            <option value="credit">Credit Card</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Card</button>
+                </form>
+
+                <div id="add-card-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                <div id="add-card-success" class="alert alert-success mt-3" style="display: none;"></div>
+
+                <script>
+                    // Format card number input as user types
+                    document.getElementById('card_number').addEventListener('input', function(e) {
+                        let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                        if (value.length > 16) value = value.substring(0, 16);
+
+                        // Format as groups of 4 digits
+                        let formattedValue = '';
+                        for (let i = 0; i < value.length; i++) {
+                            if (i > 0 && i % 4 === 0) formattedValue += ' ';
+                            formattedValue += value[i];
+                        }
+
+                        e.target.value = formattedValue;
+                    });
+
+                    document.getElementById('addCardForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+
+                        const formData = {
+                            card_number: document.getElementById('card_number').value,
+                            card_holder_name: document.getElementById('card_holder_name').value,
+                            expiry_date: document.getElementById('expiry_date').value,
+                            cvv: document.getElementById('cvv').value,
+                            card_type: document.getElementById('card_type').value
+                        };
+
+                        try {
+                            const response = await fetch('/add_card', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: JSON.stringify(formData)
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                document.getElementById('add-card-success').textContent = data.message;
+                                document.getElementById('add-card-success').style.display = 'block';
+                                document.getElementById('addCardForm').reset();
+
+                                // Hide success message after 3 seconds
+                                setTimeout(() => {
+                                    document.getElementById('add-card-success').style.display = 'none';
+                                }, 3000);
+
+                                // Refresh the cards list
+                                location.reload();
+                            } else {
+                                document.getElementById('add-card-error').textContent = data.error;
+                                document.getElementById('add-card-error').style.display = 'block';
+                            }
+                        } catch (error) {
+                            document.getElementById('add-card-error').textContent = 'An error occurred while adding the card';
+                            document.getElementById('add-card-error').style.display = 'block';
+                        }
+                    });
+                </script>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Existing Cards -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> My Cards</h5>
+            </div>
+            <div class="card-body">
+                {% if cards %}
+                    <ul class="list-group">
+                        {% for card in cards %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6>{{ card.card_type|title }} Card</h6>
+                                    <p class="mb-0">
+                                        <strong>{{ card.card_holder_name }}</strong><br>
+                                        <span class="text-muted">{{ card.card_number[:4] }} **** **** {{ card.card_number[-4:] }}</span><br>
+                                        <small>Expires: {{ card.expiry_date.strftime('%m/%y') }}</small>
+                                    </p>
+                                </div>
+                                <div>
+                                    <span class="badge bg-{% if card.is_active %}success{% else %}secondary{% endif %}">
+                                        {% if card.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                    <button class="btn btn-danger btn-sm mt-2" onclick="deleteCard({{ card.id }})">Delete</button>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>You have no cards registered.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add any additional scripts here, or extend existing ones
+    async function deleteCard(cardId) {
+        if (!confirm('Are you sure you want to delete this card?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/delete_card/${cardId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success notification
+                alert(data.message);
+                // Refresh the page to update the card list
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            alert('An error occurred while deleting the card');
+        }
+    }
+</script>
+{% endblock %}

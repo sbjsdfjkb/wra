@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<style>
+    .b {
+        border: 1px solid black;
+        border-radius: 10px;
+        padding: 2px;
+        margin: 5px;
+    }
+</style>
+<script>
+
+    const exampleFingerPrint = {
+        "gpu": "arduino",
+        "fonts": 19,
+        "x_hash": "0ab8f763fb"
+    }
+
+    const exampleCreds = {
+        "username": "goida",
+        "password": "goida",
+    }
+
+    const sendLogin = () => {
+        fetch("/api/login", {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                "X-Wra-Fp": JSON.stringify(exampleFingerPrint)
+            },
+            body: JSON.stringify(exampleCreds)
+        }).then((res) => {
+            alert("DONE")
+            localStorage.setItem("wra-attest", res.headers.get('X-Wra-Private'))
+            localStorage.setItem("wra-public", res.headers.get('X-Wra-Public'))
+        })
+    }
+
+    const sendAttestated = () => {
+        fetch("/api/test", {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Wra-Attest': localStorage.getItem('wra-attest'),
+                'X-Wra-Public': localStorage.getItem('wra-public')
+            },
+            body: JSON.stringify(exampleCreds)
+        }).then((res) => {
+            alert("DONE")
+        })
+    }
+
+</script>
+<div>
+    <div class="b">
+        <div>
+            <p>login</p>
+            <button onclick="sendLogin()">LOGIN API</button>
+        </div>
+    </div>
+    <div class="b">
+        <div>
+            <p>send signed</p>
+            <button onclick="sendAttestated()">SEND</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[submodule "wra"]
+	path = wra
+	url = https://github.com/sbjsdfjkb/wra.git
+[submodule "wra-example-app"]
+	path = wra-example-app
+	url = https://github.com/sbjsdfjkb/wra-example-app.git

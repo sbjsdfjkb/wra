@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block header %}Operations{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Add Transaction Form -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-plus-circle"></i> Add Transaction</h5>
+            </div>
+            <div class="card-body">
+                <form id="addTransactionForm">
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="amount" name="amount"
+                               placeholder="0.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Transaction Type</label>
+                        <select class="form-select" id="type" name="type" required>
+                            <option value="transfer">Transfer</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description"
+                                  rows="2" placeholder="Enter description"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Add Transaction</button>
+                </form>
+
+                <div id="transaction-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                <div id="transaction-success" class="alert alert-success mt-3" style="display: none;"></div>
+
+                <script>
+                    document.getElementById('addTransactionForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+
+                        const formData = {
+                            amount: parseFloat(document.getElementById('amount').value),
+                            type: document.getElementById('type').value,
+                            description: document.getElementById('description').value
+                        };
+
+                        try {
+                            const body = JSON.stringify(formData)
+
+                            const id_ = uuidv4();
+                            const timestamp = new Date().getTime()
+
+                            const response = await fetch('/add_transaction', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-Wra-Attest': await signCookie(body,timestamp,id_),
+                                    'X-Wra-Public': localStorage.getItem('wra-public'),
+                                    'X-Id': id_,
+                                    'X-Timestamp': timestamp
+                                },
+                                body: body
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                document.getElementById('transaction-success').textContent = data.message;
+                                document.getElementById('transaction-success').style.display = 'block';
+                                document.getElementById('addTransactionForm').reset();
+
+                                // Hide success message after 3 seconds
+                                setTimeout(() => {
+                                    document.getElementById('transaction-success').style.display = 'none';
+                                }, 3000);
+
+                                // Refresh the page to update the transaction list
+                                location.reload();
+                            } else {
+                                document.getElementById('transaction-error').textContent = data.error;
+                                document.getElementById('transaction-error').style.display = 'block';
+                            }
+                        } catch (error) {
+                            document.getElementById('transaction-error').textContent = 'An error occurred while adding the transaction';
+                            document.getElementById('transaction-error').style.display = 'block';
+                            throw error
+                        }
+                    });
+                </script>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Transaction History</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    {% if transactions %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                <tr>
+                                    <td>{{ transaction.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if transaction.transaction_type == 'deposit' %}success{% elif transaction.transaction_type == 'withdrawal' %}danger{% else %}primary{% endif %}">
+                                            {{ transaction.transaction_type|title }}
+                                        </span>
+                                    </td>
+                                    <td>{{ transaction.description or 'N/A' }}</td>
+                                    <td class="{% if transaction.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        {% if transaction.amount > 0 %}+{% endif %}${{ "%.2f"|format(transaction.amount) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No transactions recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

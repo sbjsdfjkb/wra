@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block header %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Balance Card -->
+    <div class="col-md-4">
+        <div class="card balance-card text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-wallet"></i> Account Balance</h5>
+                <h2>${{ "%.2f"|format(current_user.balance) }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <div class="d-grid gap-2 d-md-flex">
+                    <a href="{{ url_for('operations') }}" class="btn btn-primary me-md-2">
+                        <i class="fas fa-exchange-alt"></i> View Operations
+                    </a>
+                    </a>
+                    <a href="{{ url_for('chat') }}" class="btn btn-info">
+                        <i class="fas fa-comments"></i> Open Chat
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Recent Transactions -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Recent Transactions</h5>
+            </div>
+            <div class="card-body">
+                {% if transactions %}
+                    <ul class="list-group list-group-flush">
+                        {% for transaction in transactions %}
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">{{ transaction.transaction_type|title }}</div>
+                                {{ transaction.description or 'N/A' }}
+                            </div>
+                            <span class="badge bg-{% if transaction.amount > 0 %}success{% else %}danger{% endif %}-subtle text-{% if transaction.amount > 0 %}success{% else %}danger{% endif %}">
+                                {% if transaction.amount > 0 %}+{% endif %}${{ "%.2f"|format(transaction.amount) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No recent transactions.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+
+</div>
+{% endblock %}
