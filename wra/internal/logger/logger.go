@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"os"
+	"wra/internal/config"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -12,7 +12,7 @@ var SecuritySugaredLogger *zap.SugaredLogger
 
 func init() {
 	logLevel := zapcore.InfoLevel
-	if levelStr := os.Getenv("LOG_LEVEL"); levelStr != "" {
+	if levelStr := config.Configuration.Logging.Level; levelStr != "" {
 		switch levelStr {
 		case "debug":
 			logLevel = zapcore.DebugLevel
@@ -27,26 +27,49 @@ func init() {
 		}
 	}
 
-	config := zap.Config{
+	commonOutputPaths := make([]string, 0, 2)
+	if config.Configuration.Logging.IsWriteCommon2StdoutLog {
+		commonOutputPaths = append(commonOutputPaths, "stdout")
+	}
+	if val := config.Configuration.Logging.CommonLogPath; val != "" {
+		commonOutputPaths = append(commonOutputPaths, val)
+	}
+
+	securityOutputPaths := make([]string, 0, 2)
+	if config.Configuration.Logging.IsWriteSecurity2StdoutLog {
+		securityOutputPaths = append(securityOutputPaths, "stdout")
+	}
+	if val := config.Configuration.Logging.SecurityLogPath; val != "" {
+		securityOutputPaths = append(securityOutputPaths, val)
+	}
+
+	errorOutputPaths := make([]string, 0, 2)
+	if config.Configuration.Logging.IsWriteError2StdoutLog {
+		errorOutputPaths = append(errorOutputPaths, "stderr")
+	}
+	if val := config.Configuration.Logging.ErrorLogPath; val != "" {
+		errorOutputPaths = append(errorOutputPaths, val)
+	}
+
+	commonConfig := zap.Config{
 		Level:            zap.NewAtomicLevelAt(logLevel),
 		Development:      true,
-		Encoding:         "console",
+		Encoding:         config.Configuration.Logging.Format,
 		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
-		OutputPaths:      []string{"stdout", "logfile.log"},
-		ErrorOutputPaths: []string{"stderr", "errlog.log"},
+		OutputPaths:      commonOutputPaths,
+		ErrorOutputPaths: errorOutputPaths,
 	}
 
 	securityConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(logLevel),
-		Development: true,
-		Encoding:    "console",
-		//Encoding:         "json",
+		Level:            zap.NewAtomicLevelAt(logLevel),
+		Development:      true,
+		Encoding:         config.Configuration.Logging.Format,
 		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
-		OutputPaths:      []string{"stderr", "security.log"},
-		ErrorOutputPaths: []string{"stderr", "errlog.log"},
+		OutputPaths:      securityOutputPaths,
+		ErrorOutputPaths: errorOutputPaths,
 	}
 
-	logger, err := config.Build()
+	logger, err := commonConfig.Build()
 	if err != nil {
 		panic(err)
 	}
