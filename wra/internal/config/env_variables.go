@@ -31,8 +31,8 @@ type EnvConfig struct {
 		ErrorLogPath    string `env:"WRA_ERRORLOG_PATH"`
 	}
 	Metrics struct {
-		Enabled string `env:"WRA_METRICS_ENABLED,default=false"`
-		Port    int    `env:"WRA_METRICS_PORT,default=8078"`
+		Enabled bool   `env:"WRA_METRICS_ENABLED,default=false"`
+		Address string `env:"WRA_METRICS_ADDR,default=127.0.0.1:8078"`
 	}
 }
 
