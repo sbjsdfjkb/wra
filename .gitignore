@@ -1,1 +1,52 @@
 NOTES.md
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Docker
+*.log
+.docker/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+instance/
+.sqlite3
+
+# Node
+node_modules/
+.next/
+out/
+*.local
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

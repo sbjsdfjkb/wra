@@ -6,9 +6,15 @@ services:
     ports:
       - 8079:8079
     environment:
-      WRA_PROXY_TARGET: "http://vulnapp:5000"
-      WRA_REDIS_ADDR: "redis:6379"
+      WRA_PROXY_TARGET: "${WRA_PROXY_TARGET:-http://vulnapp:5000}"
+      WRA_REDIS_ADDR: "${WRA_REDIS_ADDR:-redis:6379}"
+      WRA_BACKEND_ALERT_URL: "${WRA_BACKEND_ALERT_URL:-http://admin_back:8080/api/alert}"
+    depends_on:
+      - redis
+      - admin_back
     restart: unless-stopped
+    networks:
+      - wra-network
 
   admin_back:
     build:
@@ -16,36 +22,79 @@ services:
       target: final
     ports:
       - 8080:8080
+    environment:
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_USER: "${DB_USER:-wra}"
+      DB_PASSWORD: "${DB_PASSWORD:-wra}"
+      DB_NAME: "${DB_NAME:-wra}"
+      DB_SSLMODE: "${DB_SSLMODE:-disable}"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - wra-network
 
   admin_front:
-    build: wra-admin-front
+    build:
+      context: wra-admin-front
+      target: runner
     ports:
       - 3000:3000
+    environment:
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8080/api}"
+    depends_on:
+      - admin_back
     restart: unless-stopped
-
+    networks:
+      - wra-network
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     ports:
       - "6379:6379"
     restart: unless-stopped
-
+    networks:
+      - wra-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: wra-postgres
     restart: always
     environment:
-      POSTGRES_USER: wra
-      POSTGRES_PASSWORD: wra
-      POSTGRES_DB: wra
+      POSTGRES_USER: "${DB_USER:-wra}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-wra}"
+      POSTGRES_DB: "${DB_NAME:-wra}"
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - wra-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wra} -d ${DB_NAME:-wra}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   vulnapp:
-    build: wra-example-app
+    build:
+      context: wra-example-app
     ports:
       - "5000:5000"
     restart: unless-stopped
+    networks:
+      - wra-network
 
+networks:
+  wra-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
