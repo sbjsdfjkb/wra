@@ -10,6 +10,21 @@ services:
       WRA_REDIS_ADDR: "redis:6379"
     restart: unless-stopped
 
+  admin_back:
+    build:
+      context: wra-admin-back
+      target: final
+    ports:
+      - 8080:8080
+    restart: unless-stopped
+
+  admin_front:
+    build: wra-admin-front
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+
+
   redis:
     image: redis:7
     ports:
