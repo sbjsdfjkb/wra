@@ -31,6 +31,18 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+
+  postgres:
+    image: postgres:16
+    container_name: wra-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: wra
+      POSTGRES_PASSWORD: wra
+      POSTGRES_DB: wra
+    ports:
+      - "5432:5432"
+
   vulnapp:
     build: wra-example-app
     ports:

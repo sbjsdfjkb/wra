@@ -1,0 +1,19 @@
+{% macro flash_messages(category_filter=None) %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            {% if category_filter is none or category == category_filter %}
+            <div class="alert alert-{{ category if category != 'error' else 'danger' }}">{{ message }}</div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+{% endmacro %}
+
+{% macro error_div(id, classes="alert alert-danger mt-3") %}
+<div id="{{ id }}" class="{{ classes }}" style="display: none;"></div>
+{% endmacro %}
+
+{% macro success_div(id, classes="alert alert-success mt-3") %}
+<div id="{{ id }}" class="{{ classes }}" style="display: none;"></div>
+{% endmacro %}

@@ -1,0 +1,11 @@
+{% macro button(text, url="#", btn_class="btn btn-primary", icon="", type="button", id="") %}
+<a href="{{ url }}" class="{{ btn_class }}" {% if id %}id="{{ id }}"{% endif %}>
+    {% if icon %}<i class="fas fa-{{ icon }}"></i> {% endif %}{{ text }}
+</a>
+{% endmacro %}
+
+{% macro submit_button(text, btn_class="btn btn-primary w-100", icon="", type="submit", id="") %}
+<button type="{{ type }}" class="{{ btn_class }}" {% if id %}id="{{ id }}"{% endif %}>
+    {% if icon %}<i class="fas fa-{{ icon }}"></i> {% endif %}{{ text }}
+</button>
+{% endmacro %}

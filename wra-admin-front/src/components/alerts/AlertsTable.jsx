@@ -120,7 +120,7 @@ export function AlertsTable({ alerts, onAlertClick }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="font-medium max-w-xs truncate">
-                  <a href={"/dashboard/alerts/1"}>{alert.title}</a>
+                  <a href={`/dashboard/alerts/${alert.id}`}>{alert.title}</a>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline">{alert.category}</Badge>
@@ -132,8 +132,8 @@ export function AlertsTable({ alerts, onAlertClick }) {
                   {alert.rule}
                 </TableCell>
                 <TableCell>
-                  <Badge>
-                    LABEL
+                  <Badge variant={status.badgeVariant} className={status.badgeClass}>
+                    {status.label}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm flex items-center gap-1">

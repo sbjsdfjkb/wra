@@ -18,6 +18,9 @@ type EnvConfig struct {
 		WraProxyTarget   string `env:"WRA_PROXY_TARGET,required=true"`
 		WraListenAddress string `env:"WRA_LISTEN_ADDRESS,default=0.0.0.0"`
 	}
+	Backend struct {
+		AlertURL string `env:"WRA_BACKEND_ALERT_URL,default=http://localhost:8080/api/alert"`
+	}
 	Logging struct {
 		Level  string `env:"WRA_LOG_LEVEL,default=info"`
 		Format string `env:"WRA_LOG_FORMAT,default=console"`

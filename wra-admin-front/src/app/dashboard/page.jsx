@@ -44,7 +44,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Area, AreaChart, Bar, BarChart, XAxis, YAxis } from "recharts";
-import { allAlerts } from "@/data/alerts";
+import { fetchAlerts } from "@/lib/alerts-api";
 
 const API_URL = "http://localhost:8080/health";
 
@@ -68,10 +68,9 @@ const networkData = [
   { time: "Вс", traffic: 2.1, threats: 10 },
 ];
 
-const recentAlerts = allAlerts;
-
 export default function DashboardPage() {
   const [healthData, setHealthData] = useState(null);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -92,8 +91,18 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchAlertsData = async () => {
+    try {
+      const data = await fetchAlerts();
+      setAlerts(data);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+    }
+  };
+
   useEffect(() => {
     fetchHealth();
+    fetchAlertsData();
   }, []);
 
   const activeAgents = [
@@ -298,32 +307,32 @@ export default function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentAlerts.map((alert) => (
+                      {alerts.length > 0 ? alerts.slice(0, 10).map((alert) => (
                         <TableRow key={alert.id}>
                           <TableCell>
                             <Badge
                               variant={
-                                alert.type === "critical"
+                                alert.severity === "critical"
                                   ? "destructive"
-                                  : alert.type === "high"
+                                  : alert.severity === "high"
                                   ? "outline"
                                   : "secondary"
                               }
                               className={
-                                alert.type === "critical"
+                                alert.severity === "critical"
                                   ? ""
-                                  : alert.type === "high"
+                                  : alert.severity === "high"
                                   ? "border-orange-500 text-orange-500"
-                                  : alert.type === "medium"
+                                  : alert.severity === "medium"
                                   ? "border-yellow-500 text-yellow-500"
                                   : ""
                               }
                             >
-                              {alert.type === "critical" && "Критический"}
-                              {alert.type === "high" && "Высокий"}
-                              {alert.type === "medium" && "Средний"}
-                              {alert.type === "low" && "Низкий"}
-                              {alert.type === "info" && "Инфо"}
+                              {alert.severity === "critical" && "Критический"}
+                              {alert.severity === "high" && "Высокий"}
+                              {alert.severity === "medium" && "Средний"}
+                              {alert.severity === "low" && "Низкий"}
+                              {alert.severity === "info" && "Инфо"}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">
@@ -342,7 +351,13 @@ export default function DashboardPage() {
                             {alert.time}
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            Нет алертов
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </ScrollArea>

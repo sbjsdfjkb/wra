@@ -2,6 +2,7 @@ package tosrv
 
 import (
 	"net/http"
+	"wra/internal/alert"
 	"wra/internal/kvstorage"
 	"wra/internal/logger"
 	"wra/internal/pipeline/base"
@@ -14,8 +15,6 @@ type SignCheckerHandler struct {
 }
 
 func (h *SignCheckerHandler) HandleToSrv(r *http.Request, body string, log *zap.SugaredLogger) base.PipelineResult {
-	// Копируем заголовки и при желании меняем их
-
 	securityLogger := logger.GetSecurityLogger()
 
 	clientUUID, clientUUIDExists := r.Header["X-Wra-Public"]
@@ -63,6 +62,25 @@ func (h *SignCheckerHandler) HandleToSrv(r *http.Request, body string, log *zap.
 				securityLogger.Warn("Signature verification failed",
 					zap.String("client_uuid", clientUUIDVal),
 					zap.String("request_id", reqIdVal))
+
+				alert.SendAlert(alert.Alert{
+					Severity:    "critical",
+					Title:       "Критическое несовпадение Fingerprint",
+					Description: "Авторизационный токен (X-Wra-Public) предъявлен с устройства, чья подпись не соответствует исходной сессии. Вероятная кража Cookie.",
+					Source:      r.RemoteAddr,
+					Destination: "wra-proxy-node",
+					Rule:        "WRA-FP-MISMATCH-002",
+					Category:    "Session Hijacking",
+					Action:      "Доступ запрещен",
+					Status:      "new",
+					Details: map[string]any{
+						"method":    r.Method,
+						"path":      r.URL.Path,
+						"payload":   "SessionID: " + clientUUIDVal[:8] + "...",
+						"userAgent": r.UserAgent(),
+						"mismatch":  "Signature mismatch",
+					},
+				}, log)
 			}
 		}
 	} else {

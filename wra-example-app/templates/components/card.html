@@ -1,0 +1,21 @@
+{% macro card(header_text, body_content, card_classes="card", header_classes="card-header", body_classes="card-body") %}
+<div class="{{ card_classes }}">
+    {% if header_text %}
+    <div class="{{ header_classes }}">
+        <h5>{{ header_text }}</h5>
+    </div>
+    {% endif %}
+    <div class="{{ body_classes }}">
+        {{ body_content | safe }}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro balance_card(balance, title="Account Balance") %}
+<div class="card balance-card text-white">
+    <div class="card-body">
+        <h5 class="card-title"><i class="fas fa-wallet"></i> {{ title }}</h5>
+        <h2>${{ "%.2f"|format(balance) }}</h2>
+    </div>
+</div>
+{% endmacro %}
