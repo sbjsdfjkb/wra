@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -16,12 +16,16 @@ import {
   Wifi,
   Bell,
   ChevronRight,
-  Users, Shield,
+  Users,
+  Shield,
+  RefreshCcw,
+  Database,
 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -40,7 +44,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Area, AreaChart, Bar, BarChart, XAxis, YAxis } from "recharts";
-import {allAlerts} from "@/data/alerts";
+import { allAlerts } from "@/data/alerts";
+
+const API_URL = "http://localhost:8080/health";
 
 const attackData = [
   { time: "00:00", attacks: 12, blocked: 10 },
@@ -64,17 +70,41 @@ const networkData = [
 
 const recentAlerts = allAlerts;
 
-const activeAgents = [
-  { name: "(SYS) Database", status: "active", cpu: 0, memory: 0 },
-  { name: "(SYS) Redis", status: "active", cpu: 0, memory: 0 },
-  { name: "Agent-01", status: "active", cpu: 45, memory: 62 },
-  { name: "Agent-02", status: "active", cpu: 32, memory: 48 },
-  { name: "Agent-03", status: "warning", cpu: 78, memory: 85 },
-  { name: "Agent-04", status: "active", cpu: 28, memory: 41 },
-  { name: "Agent-05", status: "offline", cpu: 0, memory: 0 },
-];
-
 export default function DashboardPage() {
+  const [healthData, setHealthData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchHealth = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setHealthData(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHealth();
+  }, []);
+
+  const activeAgents = [
+    { name: "(SYS) Database", status: healthData?.db_status ? "active" : "offline", ping: healthData?.db_ping || 0 },
+    { name: "(SYS) Redis", status: healthData?.redis_status ? "active" : "offline", ping: healthData?.redis_ping || 0 },
+    { name: "Agent-01", status: "active", cpu: 45, memory: 62 },
+    { name: "Agent-02", status: "active", cpu: 32, memory: 48 },
+    { name: "Agent-03", status: "warning", cpu: 78, memory: 85 },
+    { name: "Agent-04", status: "active", cpu: 28, memory: 41 },
+    { name: "Agent-05", status: "offline", cpu: 0, memory: 0 },
+  ];
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader />
@@ -87,16 +117,30 @@ export default function DashboardPage() {
               Главный дашборд
             </h1>
             <p className="text-muted-foreground">
+              Мониторинг системы безопасности
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Badge
               variant="outline"
-              className="gap-2 px-4 py-2 text-sm border-green-500/50 bg-green-500/10 text-green-500"
+              className={`gap-2 px-4 py-2 text-sm ${
+                healthData?.status === "UP"
+                  ? "border-green-500/50 bg-green-500/10 text-green-500"
+                  : "border-red-500/50 bg-red-500/10 text-red-500"
+              }`}
             >
               <CheckCircle className="h-4 w-4" />
-              UPTIME
+              {healthData?.status || "UNKNOWN"}
             </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchHealth}
+              disabled={loading}
+              className={loading ? "animate-pulse" : ""}
+            >
+              <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
             <span className="text-sm text-muted-foreground">
               {new Date().toLocaleTimeString("ru-RU", {
                 hour: "2-digit",
@@ -106,17 +150,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {error && (
+          <Card className="border-red-500/50 bg-red-500/10">
+            <CardContent className="pt-6">
+              <p className="text-red-500 text-sm">Ошибка загрузки данных: {error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Карточки метрик */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Алерты за 1 час
+                Алерты за 24ч
               </CardTitle>
               <AlertTriangle className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-500">23</div>
+              <div className="text-2xl font-bold text-red-500">
+                {loading ? "..." : healthData?.alerts_last_24h || 0}
+              </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <TrendingUp className="h-3 w-3" />
                 <span>INFO, DEBUG События</span>
@@ -127,13 +181,13 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Количество событий
+                Событий за 24ч
               </CardTitle>
-              <Lock className="h-4 w-4 text-green-500" />
+              <Activity className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-500">
-                809
+                {loading ? "..." : healthData?.events_last_24h || 0}
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <TrendingUp className="h-3 w-3" />
@@ -145,15 +199,28 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Сетевой трафик
+                Redis
               </CardTitle>
-              <Globe className="h-4 w-4 text-blue-500" />
+              <Database className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2.4 TB</div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <TrendingDown className="h-3 w-3" />
-                <span>-3% за неделю</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold">
+                  {loading ? "..." : healthData?.redis_ping || 0}
+                </span>
+                <span className="text-xs text-muted-foreground">ms</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs mt-1">
+                <Badge
+                  variant="outline"
+                  className={
+                    healthData?.redis_status
+                      ? "border-green-500 text-green-500"
+                      : "border-red-500 text-red-500"
+                  }
+                >
+                  {healthData?.redis_status ? "UP" : "DOWN"}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -161,15 +228,28 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Активных агентов
+                Database
               </CardTitle>
-              <Server className="h-4 w-4 text-purple-500" />
+              <Server className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2</div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                <CheckCircle className="h-3 w-3" />
-                <span>wra agent</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold">
+                  {loading ? "..." : healthData?.db_ping || 0}
+                </span>
+                <span className="text-xs text-muted-foreground">ms</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs mt-1">
+                <Badge
+                  variant="outline"
+                  className={
+                    healthData?.db_status
+                      ? "border-green-500 text-green-500"
+                      : "border-red-500 text-red-500"
+                  }
+                >
+                  {healthData?.db_status ? "UP" : "DOWN"}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -305,46 +385,60 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
-                        <div className="w-32 space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Cpu className="h-3 w-3" />
-                              CPU
-                            </span>
-                            <span>{agent.cpu}%</span>
+                        {/* Для системных сервисов показываем ping */}
+                        {(agent.name === "(SYS) Database" || agent.name === "(SYS) Redis") && (
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">Ping</p>
+                              <p className="text-lg font-bold">{agent.ping} ms</p>
+                            </div>
                           </div>
-                          <Progress
-                            value={agent.cpu}
-                            className="h-2"
-                            indicatorClassName={
-                              agent.cpu > 75
-                                ? "bg-red-500"
-                                : agent.cpu > 50
-                                ? "bg-yellow-500"
-                                : "bg-green-500"
-                            }
-                          />
-                        </div>
-                        <div className="w-32 space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <HardDrive className="h-3 w-3" />
-                              RAM
-                            </span>
-                            <span>{agent.memory}%</span>
-                          </div>
-                          <Progress
-                            value={agent.memory}
-                            className="h-2"
-                            indicatorClassName={
-                              agent.memory > 75
-                                ? "bg-red-500"
-                                : agent.memory > 50
-                                ? "bg-yellow-500"
-                                : "bg-green-500"
-                            }
-                          />
-                        </div>
+                        )}
+                        {/* Для агентов показываем CPU/RAM */}
+                        {agent.name !== "(SYS) Database" && agent.name !== "(SYS) Redis" && (
+                          <>
+                            <div className="w-32 space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <Cpu className="h-3 w-3" />
+                                  CPU
+                                </span>
+                                <span>{agent.cpu}%</span>
+                              </div>
+                              <Progress
+                                value={agent.cpu}
+                                className="h-2"
+                                indicatorClassName={
+                                  agent.cpu > 75
+                                    ? "bg-red-500"
+                                    : agent.cpu > 50
+                                    ? "bg-yellow-500"
+                                    : "bg-green-500"
+                                }
+                              />
+                            </div>
+                            <div className="w-32 space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <HardDrive className="h-3 w-3" />
+                                  RAM
+                                </span>
+                                <span>{agent.memory}%</span>
+                              </div>
+                              <Progress
+                                value={agent.memory}
+                                className="h-2"
+                                indicatorClassName={
+                                  agent.memory > 75
+                                    ? "bg-red-500"
+                                    : agent.memory > 50
+                                    ? "bg-yellow-500"
+                                    : "bg-green-500"
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
                         <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </div>
                     </div>

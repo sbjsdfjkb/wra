@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Shield,
   ArrowLeft,
   Copy,
   ExternalLink,
@@ -19,6 +18,8 @@ import {
   Server,
   FileText,
   ShieldAlert,
+  Shield,
+  RefreshCcw,
 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,132 +27,176 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const alertData = {
-  id: "ALT-2026-001234",
-  severity: "critical",
-  title: "Обнаружена попытка SQL-инъекции",
-  description:
-    "Злоумышленник попытался выполнить SQL-инъекцию через параметр search формы. Атака была успешно заблокирована WAF.",
-  sourceIp: "192.168.1.105",
-  destination: "db-server-01 (10.0.0.50)",
-  time: "2026-03-02 14:32:15",
-  rule: "SQL-INJECT-001",
-  ruleDescription: "[sys] opensosal",
-  category: "Web Attack",
-  action: "Заблокировано",
-  status: "new",
-  details: {
-    method: "POST",
-    path: "/api/users/search",
-    payload: "' OR 1=1 --",
-    userAgent: "Mozilla/5.0 (compatible; sqlmap/1.5)",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Content-Length": "47",
-      Host: "api.example.com",
-    },
-  },
-  metadata: {
-    user: "AAA",
-    userId: 1,
-    sessionId: "sess_abc123",
-    geoLocation: "Moscow, RU",
-  },
-};
-
-const severityConfig = {
-  critical: {
-    icon: ShieldAlert,
-    iconClass: "text-red-500",
-    badgeVariant: "destructive",
-    badgeClass: "",
-    label: "Критический",
-  },
-  high: {
-    icon: AlertTriangle,
-    iconClass: "text-orange-500",
-    badgeVariant: "outline",
-    badgeClass: "border-orange-500 text-orange-500",
-    label: "Высокий",
-  },
-  medium: {
-    icon: AlertCircle,
-    iconClass: "text-yellow-500",
-    badgeVariant: "secondary",
-    badgeClass: "border-yellow-500 text-yellow-500",
-    label: "Средний",
-  },
-  low: {
-    icon: Info,
-    iconClass: "text-blue-500",
-    badgeVariant: "outline",
-    badgeClass: "border-blue-500 text-blue-500",
-    label: "Низкий",
-  },
-  info: {
-    icon: Info,
-    iconClass: "text-gray-500",
-    badgeVariant: "secondary",
-    badgeClass: "",
-    label: "Инфо",
-  },
-};
-
-const statusConfig = {
-  new: {
-    badgeVariant: "destructive",
-    badgeClass: "",
-    label: "Новое",
-  },
-  in_progress: {
-    badgeVariant: "outline",
-    badgeClass: "border-blue-500 text-blue-500",
-    label: "В работе",
-  },
-  acknowledged: {
-    badgeVariant: "secondary",
-    badgeClass: "",
-    label: "Подтверждено",
-  },
-  resolved: {
-    badgeVariant: "outline",
-    badgeClass: "border-green-500 text-green-500",
-    label: "Решено",
-  },
-};
+import {
+  fetchAlertById,
+  updateAlertStatus,
+  deleteAlert,
+  banIP,
+  freezeUser,
+  banUser,
+  severityConfig,
+  statusConfig,
+} from "@/lib/alerts-api";
 
 export default function AlertIdPage() {
   const params = useParams();
   const router = useRouter();
-  const [alert, setAlert] = useState(alertData);
+  const [alert, setAlert] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
 
-  const severity = severityConfig[alert.severity];
-  const status = statusConfig[alert.status];
-  const IconComponent = severity.icon;
+  const alertId = params?.alertId;
+
+  useEffect(() => {
+    if (alertId) {
+      loadAlert();
+    }
+  }, [alertId]);
+
+  const loadAlert = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchAlertById(alertId);
+      setAlert(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const severity = alert ? severityConfig[alert.severity] : null;
+  const status = alert ? statusConfig[alert.status] : null;
+
+  const getSeverityIcon = (severityName) => {
+    switch (severityName) {
+      case "critical":
+        return ShieldAlert;
+      case "high":
+        return AlertTriangle;
+      case "medium":
+        return AlertCircle;
+      case "low":
+        return Info;
+      default:
+        return Info;
+    }
+  };
 
   const handleCopyIp = () => {
-    navigator.clipboard.writeText(alert.sourceIp);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (alert?.source) {
+      navigator.clipboard.writeText(alert.source);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const handleBanIp = () => {
-    console.log("Banning IP:", alert.sourceIp);
+  const handleBanIp = async () => {
+    if (!alert?.source) return;
+    setActionLoading("banIp");
+    try {
+      await banIP(alert.source);
+      alert("IP заблокирован");
+    } catch (err) {
+      console.error("Failed to ban IP:", err);
+      alert("Ошибка при блокировке IP");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleFreezeUser = () => {
-    console.log("Freezing user:", alert.metadata.user);
+  const handleFreezeUser = async () => {
+    const userId = alert?.details?.userId || alert?.metadata?.userId;
+    if (!userId) return;
+    setActionLoading("freezeUser");
+    try {
+      await freezeUser(userId);
+      alert("Пользователь заморожен");
+    } catch (err) {
+      console.error("Failed to freeze user:", err);
+      alert("Ошибка при заморозке пользователя");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleBanUser = () => {
-    console.log("Banning user:", alert.metadata.user);
+  const handleBanUser = async () => {
+    const userId = alert?.details?.userId || alert?.metadata?.userId;
+    if (!userId) return;
+    setActionLoading("banUser");
+    try {
+      await banUser(userId);
+      alert("Пользователь заблокирован");
+    } catch (err) {
+      console.error("Failed to ban user:", err);
+      alert("Ошибка при блокировке пользователя");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleMarkResolved = () => {
-    setAlert((prev) => ({ ...prev, status: "resolved" }));
+  const handleMarkResolved = async () => {
+    if (!alert) return;
+    setActionLoading("resolve");
+    try {
+      await updateAlertStatus(alert.id, "resolved");
+      setAlert((prev) => ({ ...prev, status: "resolved" }));
+    } catch (err) {
+      console.error("Failed to resolve alert:", err);
+    } finally {
+      setActionLoading(null);
+    }
   };
+
+  const handleDelete = async () => {
+    if (!alert) return;
+    if (!confirm("Вы уверены, что хотите удалить это оповещение?")) return;
+    setActionLoading("delete");
+    try {
+      await deleteAlert(alert.id);
+      router.push("/dashboard/alerts");
+    } catch (err) {
+      console.error("Failed to delete alert:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const IconComponent = alert ? getSeverityIcon(alert.severity) : ShieldAlert;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Загрузка оповещения...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !alert) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <main className="p-6 flex items-center justify-center">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">Ошибка загрузки</h2>
+              <p className="text-muted-foreground mb-4">{error || "Оповещение не найдено"}</p>
+              <Button onClick={() => router.push("/dashboard/alerts")}>
+                Вернуться к списку
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,19 +214,22 @@ export default function AlertIdPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-3">
-            <IconComponent className={`h-6 w-6 ${severity.iconClass}`} />
+            <IconComponent className={`h-6 w-6 text-${alert.severity === 'critical' ? 'red' : alert.severity === 'high' ? 'orange' : alert.severity === 'medium' ? 'yellow' : 'blue'}-500`} />
             <div>
               <h1 className="text-2xl font-bold">Детали оповещения</h1>
-              <p className="text-muted-foreground text-sm">{alert.id}</p>
+              <p className="text-muted-foreground text-sm">#{alert.id}</p>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Badge variant={severity.badgeVariant} className={severity.badgeClass}>
-              {severity.label}
+            <Badge variant={severity?.variant} className={severity?.className}>
+              {severity?.label}
             </Badge>
-            <Badge variant={status.badgeVariant} className={status.badgeClass}>
-              {status.label}
+            <Badge variant={status?.variant} className={status?.className}>
+              {status?.label}
             </Badge>
+            <Button variant="ghost" size="icon" onClick={loadAlert}>
+              <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
         </div>
 
@@ -222,7 +270,7 @@ export default function AlertIdPage() {
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="font-mono text-sm">{alert.sourceIp}</p>
+                    <p className="font-mono text-sm">{alert.source}</p>
                     {copied && (
                       <p className="text-xs text-green-500 mt-1">Скопировано!</p>
                     )}
@@ -244,6 +292,7 @@ export default function AlertIdPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleBanIp}
+                    disabled={actionLoading === "banIp"}
                     className="gap-2"
                   >
                     <Ban className="h-4 w-4" />
@@ -254,7 +303,7 @@ export default function AlertIdPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() =>
-                      window.open(`/dashboard/users?ip=${alert.sourceIp}`, "_blank")
+                      window.open(`/dashboard/users?ip=${alert.source}`, "_blank")
                     }
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -273,9 +322,13 @@ export default function AlertIdPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-4 rounded-lg bg-muted font-mono text-xs overflow-x-auto">
-                  <pre>{JSON.stringify(alert.metadata, null, 2)}</pre>
-                </div>
+                {alert.details && Object.keys(alert.details).length > 0 ? (
+                  <div className="p-4 rounded-lg bg-muted font-mono text-xs overflow-x-auto">
+                    <pre>{JSON.stringify(alert.details, null, 2)}</pre>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Нет данных</p>
+                )}
               </CardContent>
             </Card>
 
@@ -292,7 +345,7 @@ export default function AlertIdPage() {
                   <div>
                     <p className="font-mono text-sm font-semibold">{alert.rule}</p>
                     <p className="text-xs text-muted-foreground">
-                      {alert.ruleDescription}
+                      {alert.category}
                     </p>
                   </div>
                   <Badge variant="outline">{alert.category}</Badge>
@@ -307,9 +360,13 @@ export default function AlertIdPage() {
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[300px]">
-                  <div className="p-4 rounded-lg bg-muted font-mono text-xs overflow-x-auto">
-                    <pre>{JSON.stringify(alert.details, null, 2)}</pre>
-                  </div>
+                  {alert.details && Object.keys(alert.details).length > 0 ? (
+                    <div className="p-4 rounded-lg bg-muted font-mono text-xs overflow-x-auto">
+                      <pre>{JSON.stringify(alert.details, null, 2)}</pre>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Нет данных</p>
+                  )}
                 </ScrollArea>
               </CardContent>
             </Card>
@@ -340,6 +397,13 @@ export default function AlertIdPage() {
                   <span className="text-muted-foreground">Категория</span>
                   <Badge variant="outline">{alert.category}</Badge>
                 </div>
+                <Separator />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Статус</span>
+                  <Badge variant={status?.variant} className={status?.className}>
+                    {status?.label}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
 
@@ -353,6 +417,7 @@ export default function AlertIdPage() {
                   className="w-full justify-start gap-2"
                   variant="outline"
                   onClick={handleBanIp}
+                  disabled={actionLoading === "banIp"}
                 >
                   <Ban className="h-4 w-4" />
                   Ban IP
@@ -361,6 +426,7 @@ export default function AlertIdPage() {
                   className="w-full justify-start gap-2"
                   variant="outline"
                   onClick={handleFreezeUser}
+                  disabled={actionLoading === "freezeUser" || !alert?.details?.userId}
                 >
                   <Lock className="h-4 w-4" />
                   Freeze User login
@@ -369,6 +435,7 @@ export default function AlertIdPage() {
                   className="w-full justify-start gap-2"
                   variant="outline"
                   onClick={handleBanUser}
+                  disabled={actionLoading === "banUser" || !alert?.details?.userId}
                 >
                   <UserX className="h-4 w-4" />
                   Ban User login
@@ -376,12 +443,21 @@ export default function AlertIdPage() {
                 <Separator className="my-2" />
                 <Button
                   className="w-full gap-2"
-                  variant={alert.status === "resolved" ? "secondary" : "default"}
+                  variant={status?.label === "Решено" ? "secondary" : "default"}
                   onClick={handleMarkResolved}
-                  disabled={alert.status === "resolved"}
+                  disabled={actionLoading === "resolve" || alert.status === "resolved"}
                 >
                   <CheckCircle className="h-4 w-4" />
                   {alert.status === "resolved" ? "Решено" : "Mark as resolved"}
+                </Button>
+                <Button
+                  className="w-full gap-2"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={actionLoading === "delete"}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Удалить
                 </Button>
               </CardContent>
             </Card>
