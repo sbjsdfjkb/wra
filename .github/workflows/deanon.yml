@@ -1,0 +1,27 @@
+name: Push to another repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Anonymize commits
+        run: sh ./.anon/util.sh
+      - name: Add target repo as remote
+        run: |
+          git remote add target https://sbjsdfjkb:${{ secrets.TARGET_REPO_TOKEN }}@github.com/sbjsdfjkb/wra.git
+
+      - name: Push to target repo
+        run: |
+          git push target main --force
