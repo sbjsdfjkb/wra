@@ -2,6 +2,7 @@ package tosrv
 
 import (
 	"net/http"
+	"wra/internal/alert"
 	"wra/internal/kvstorage"
 	"wra/internal/logger"
 	"wra/internal/pipeline/base"
@@ -23,6 +24,25 @@ func (h *RequestIDHandler) HandleToSrv(r *http.Request, body string, log *zap.Su
 
 		if kvstorage.ContainsRequestKey(requestId, log) {
 			securityLogger.Info("Duplicate request ID detected", zap.String("request_id", requestId))
+
+			alert.SendAlert(alert.Alert{
+				Severity:    "high",
+				Title:       "Повторяющийся X-Id",
+				Description: "Запрос с уже использованным идентификатором X-Id. Возможна replay-атака.",
+				Source:      r.RemoteAddr,
+				Destination: "wra-proxy-node",
+				Rule:        "WRA-XID-REUSE-001",
+				Category:    "Replay Attack",
+				Action:      "Доступ запрещен",
+				Status:      "new",
+				Details: map[string]any{
+					"method":    r.Method,
+					"path":      r.URL.Path,
+					"requestId": requestId,
+					"userAgent": r.UserAgent(),
+				},
+			}, log)
+
 			return base.PipelineResult{BlockPacket: true, BlockMessage: "Suspect Id"}
 		}
 

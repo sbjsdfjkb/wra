@@ -49,6 +49,24 @@ func (h *SignCheckerHandler) HandleToSrv(r *http.Request, body string, log *zap.
 		if !exists {
 			securityLogger.Info("Session not found for signature verification",
 				zap.String("client_uuid", clientUUIDVal))
+
+			alert.SendAlert(alert.Alert{
+				Severity:    "high",
+				Title:       "Несуществующий X-Wra-Public",
+				Description: "Запрос с невалидным или несуществующим идентификатором сессии X-Wra-Public. Возможная попытка несанкционированного доступа.",
+				Source:      r.RemoteAddr,
+				Destination: "wra-proxy-node",
+				Rule:        "WRA-PUBLIC-INVALID-001",
+				Category:    "Unauthorized Access",
+				Action:      "Доступ запрещен",
+				Status:      "new",
+				Details: map[string]any{
+					"method":    r.Method,
+					"path":      r.URL.Path,
+					"sessionId": clientUUIDVal[:8] + "...",
+					"userAgent": r.UserAgent(),
+				},
+			}, log)
 		} else {
 			calculatedSignature := sign.SignCookie(body, sessionValue.Attestation, clientUUIDVal, timestampVal, reqIdVal)
 
