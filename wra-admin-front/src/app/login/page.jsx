@@ -46,9 +46,9 @@ export default function LoginPage() {
               <Shield className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">WRA Security</CardTitle>
+          <CardTitle className="text-2xl font-bold">WRA</CardTitle>
           <CardDescription>
-            Войдите в систему для продолжения
+            Войдите для просмотра данной страницы
           </CardDescription>
         </CardHeader>
         <CardContent>

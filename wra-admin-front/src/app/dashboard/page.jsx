@@ -40,6 +40,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Area, AreaChart, Bar, BarChart, XAxis, YAxis } from "recharts";
+import {allAlerts} from "@/data/alerts";
 
 const attackData = [
   { time: "00:00", attacks: 12, blocked: 10 },
@@ -61,55 +62,11 @@ const networkData = [
   { time: "Вс", traffic: 2.1, threats: 10 },
 ];
 
-const recentAlerts = [
-  {
-    id: 1,
-    type: "critical",
-    title: "Обнаружена попытка SQL-инъекции",
-    source: "192.168.1.105",
-    time: "2 мин назад",
-    rule: "SQL-INJECT-001",
-    action: "Заблокировано",
-  },
-  {
-    id: 2,
-    type: "high",
-    title: "Подозрительная активность пользователя",
-    source: "user_admin",
-    time: "5 мин назад",
-    rule: "USER-BEHAV-023",
-    action: "Предупреждение",
-  },
-  {
-    id: 3,
-    type: "medium",
-    title: "Превышен лимит запросов API",
-    source: "api-gateway-01",
-    time: "12 мин назад",
-    rule: "RATE-LIMIT-005",
-    action: "Ограничено",
-  },
-  {
-    id: 4,
-    type: "low",
-    title: "Неудачная попытка входа",
-    source: "10.0.0.45",
-    time: "18 мин назад",
-    rule: "AUTH-FAIL-012",
-    action: "Запротоколировано",
-  },
-  {
-    id: 5,
-    type: "info",
-    title: "Обновление сигнатур вирусов",
-    source: "security-center",
-    time: "1 час назад",
-    rule: "SYS-UPDATE-001",
-    action: "Успешно",
-  },
-];
+const recentAlerts = allAlerts;
 
 const activeAgents = [
+  { name: "(SYS) Database", status: "active", cpu: 0, memory: 0 },
+  { name: "(SYS) Redis", status: "active", cpu: 0, memory: 0 },
   { name: "Agent-01", status: "active", cpu: 45, memory: 62 },
   { name: "Agent-02", status: "active", cpu: 32, memory: 48 },
   { name: "Agent-03", status: "warning", cpu: 78, memory: 85 },
@@ -127,10 +84,9 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Панель безопасности
+              Главный дашборд
             </h1>
             <p className="text-muted-foreground">
-              Мониторинг угроз в реальном времени
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -139,7 +95,7 @@ export default function DashboardPage() {
               className="gap-2 px-4 py-2 text-sm border-green-500/50 bg-green-500/10 text-green-500"
             >
               <CheckCircle className="h-4 w-4" />
-              Система защищена
+              UPTIME
             </Badge>
             <span className="text-sm text-muted-foreground">
               {new Date().toLocaleTimeString("ru-RU", {
@@ -155,7 +111,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Активных угроз
+                Алерты за 1 час
               </CardTitle>
               <AlertTriangle className="h-4 w-4 text-red-500" />
             </CardHeader>
@@ -163,7 +119,7 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold text-red-500">23</div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <TrendingUp className="h-3 w-3" />
-                <span>+12% за последний час</span>
+                <span>INFO, DEBUG События</span>
               </div>
             </CardContent>
           </Card>
@@ -171,15 +127,17 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Заблокировано атак
+                Количество событий
               </CardTitle>
               <Lock className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-500">1,847</div>
+              <div className="text-2xl font-bold text-green-500">
+                809
+              </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <TrendingUp className="h-3 w-3" />
-                <span>98.7% эффективность</span>
+                <span>Все события</span>
               </div>
             </CardContent>
           </Card>
@@ -208,70 +166,26 @@ export default function DashboardPage() {
               <Server className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">47/50</div>
+              <div className="text-2xl font-bold">2</div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <CheckCircle className="h-3 w-3" />
-                <span>94% онлайн</span>
+                <span>wra agent</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* График атак */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Активность атак (24ч)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                attacks: {
-                  label: "Атаки",
-                  color: "hsl(var(--chart-1))",
-                },
-                blocked: {
-                  label: "Заблокировано",
-                  color: "hsl(var(--chart-2))",
-                },
-              }}
-              className="h-[300px]"
-            >
-              <AreaChart data={attackData}>
-                <XAxis dataKey="time" stroke="#888888" fontSize={12} />
-                <YAxis stroke="#888888" fontSize={12} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area
-                  type="monotone"
-                  dataKey="attacks"
-                  stroke="hsl(var(--chart-1))"
-                  fill="hsl(var(--chart-1))"
-                  fillOpacity={0.3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="blocked"
-                  stroke="hsl(var(--chart-2))"
-                  fill="hsl(var(--chart-2))"
-                  fillOpacity={0.3}
-                />
-              </AreaChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
 
         {/* Вкладки с дополнительной информацией */}
         <Tabs defaultValue="alerts" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
             <TabsTrigger value="alerts" className="gap-2">
               <Bell className="h-4 w-4" />
-              Последние оповещения
+              Последние алерты
             </TabsTrigger>
             <TabsTrigger value="agents" className="gap-2">
               <Server className="h-4 w-4" />
-              Агенты безопасности
+              Healthcheck систем
             </TabsTrigger>
             <TabsTrigger value="network" className="gap-2">
               <Wifi className="h-4 w-4" />
@@ -283,7 +197,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Последние оповещения</span>
+                  <span>Последние алерты</span>
                   <Badge variant="secondary" className="gap-1">
                     <Eye className="h-3 w-3" />
                     5 новых
@@ -359,7 +273,7 @@ export default function DashboardPage() {
           <TabsContent value="agents">
             <Card>
               <CardHeader>
-                <CardTitle>Агенты безопасности</CardTitle>
+                <CardTitle>Healthcheck систем</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
