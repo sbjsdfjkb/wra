@@ -29,8 +29,12 @@ services:
       DB_PASSWORD: "${DB_PASSWORD:-wra}"
       DB_NAME: "${DB_NAME:-wra}"
       DB_SSLMODE: "${DB_SSLMODE:-disable}"
+      REDIS_HOST: "${REDIS_HOST:-redis}"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     networks:

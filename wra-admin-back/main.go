@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +53,7 @@ func enableCORS(next http.Handler) http.Handler {
 
 var db *sql.DB
 var logger *zap.SugaredLogger
+var redisClient *redis.Client
 
 type Alert struct {
 	ID          string         `json:"id"`
@@ -94,6 +97,8 @@ func main() {
 	if err := createAlertsTable(); err != nil {
 		logger.Fatal("Failed to create alerts table", zap.Error(err))
 	}
+
+	redisClient = initRedis()
 
 	logger.Info("Starting wra-admin-back server on :8080")
 
@@ -195,22 +200,89 @@ func initLogger() {
 	logger = log.Sugar()
 }
 
+func initRedis() *redis.Client {
+	host := os.Getenv("REDIS_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+
+	port := os.Getenv("REDIS_PORT")
+	if port == "" {
+		port = "6379"
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr: host + ":" + port,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		logger.Warn("Redis connection failed", zap.Error(err))
+		return nil
+	}
+
+	logger.Info("Redis connected successfully", zap.String("addr", host+":"+port))
+	return client
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Info("Health check requested",
 		zap.String("method", r.Method),
 		zap.String("remote_addr", r.RemoteAddr))
 
 	resp := HealthResponse{
-		AlertsLast24h: 376,
-		EventsLast24h: 1337,
-
-		RedisStatus: true,
-		RedisPing:   367,
-
-		DBStatus: true,
-		DBPing:   145,
-
 		Status: "UP",
+	}
+
+	// Проверка подключения к БД и измерение пинга
+	dbStart := time.Now()
+	if err := db.Ping(); err != nil {
+		logger.Error("Database ping failed", zap.Error(err))
+		resp.DBStatus = false
+		resp.DBPing = -1
+		resp.Status = "DEGRADED"
+	} else {
+		resp.DBStatus = true
+		resp.DBPing = int(time.Since(dbStart).Milliseconds())
+	}
+
+	// Подсчёт алертов за последние 24 часа
+	if resp.DBStatus {
+		var count int64
+		err := db.QueryRow(`
+			SELECT COUNT(*) FROM alerts
+			WHERE time >= NOW() - INTERVAL '24 hours'
+		`).Scan(&count)
+		if err != nil {
+			logger.Error("Failed to count alerts", zap.Error(err))
+			resp.AlertsLast24h = -1
+		} else {
+			resp.AlertsLast24h = int(count)
+		}
+	}
+
+	// EventsLast24h пока не используется (зарезервировано на будущее)
+	resp.EventsLast24h = 0
+
+	// Проверка Redis
+	if redisClient != nil {
+		redisStart := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			logger.Warn("Redis ping failed", zap.Error(err))
+			resp.RedisStatus = false
+			resp.RedisPing = -1
+			if resp.Status == "UP" {
+				resp.Status = "DEGRADED"
+			}
+		} else {
+			resp.RedisStatus = true
+			resp.RedisPing = int(time.Since(redisStart).Milliseconds())
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
